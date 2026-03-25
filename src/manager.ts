@@ -407,8 +407,6 @@ class Manager extends EventEmitter implements types.EventsMixin {
   workRoundRobin<ReqData>(names: string[], options: types.WorkOptions & { includeMetadata: true }, handler: types.WorkWithMetadataHandler<ReqData>): Promise<string>
   workRoundRobin<ReqData>(names: string[], options: types.WorkOptions, handler: types.WorkHandler<ReqData>): Promise<string>
   async workRoundRobin<ReqData> (names: string[], ...args: unknown[]): Promise<string> {
-    assert(Array.isArray(names) && names.length >= 1, 'workRoundRobin requires a non-empty array of queue names')
-
     for (const name of names) {
       Attorney.assertQueueName(name)
     }
