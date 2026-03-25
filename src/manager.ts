@@ -300,9 +300,16 @@ class Manager extends EventEmitter implements types.EventsMixin {
 
   async failWip () {
     for (const worker of this.workers.values()) {
-      const jobIds = worker.jobs.map(j => j.id)
-      if (jobIds.length) {
-        await this.fail(worker.name, jobIds, 'pg-boss shut down while active')
+      if (worker.jobs.length) {
+        const jobsByQueue = new Map<string, string[]>()
+        for (const job of worker.jobs) {
+          const ids = jobsByQueue.get(job.name) || []
+          ids.push(job.id)
+          jobsByQueue.set(job.name, ids)
+        }
+        for (const [queueName, ids] of jobsByQueue) {
+          await this.fail(queueName, ids, 'pg-boss shut down while active')
+        }
       }
       worker.abort()
     }
@@ -385,6 +392,84 @@ class Manager extends EventEmitter implements types.EventsMixin {
     }
 
     // Spawn workers based on localConcurrency setting
+    for (let i = 0; i < localConcurrency; i++) {
+      const workerId = i === 0 ? firstWorkerId : randomUUID({ disableEntropyCache: true })
+      const worker = createWorker(workerId)
+
+      this.addWorker(worker)
+      worker.start()
+    }
+
+    return firstWorkerId
+  }
+
+  workRoundRobin<ReqData>(names: string[], handler: types.WorkHandler<ReqData>): Promise<string>
+  workRoundRobin<ReqData>(names: string[], options: types.WorkOptions & { includeMetadata: true }, handler: types.WorkWithMetadataHandler<ReqData>): Promise<string>
+  workRoundRobin<ReqData>(names: string[], options: types.WorkOptions, handler: types.WorkHandler<ReqData>): Promise<string>
+  async workRoundRobin<ReqData> (names: string[], ...args: unknown[]): Promise<string> {
+    assert(Array.isArray(names) && names.length >= 1, 'workRoundRobin requires a non-empty array of queue names')
+
+    for (const name of names) {
+      Attorney.assertQueueName(name)
+    }
+
+    const { options, callback } = Attorney.checkWorkRoundRobinArgs(names, args)
+
+    if (this.stopped) {
+      throw new Error('Workers are disabled. pg-boss is stopped')
+    }
+
+    const {
+      pollingInterval: interval,
+      batchSize = 1,
+      includeMetadata = false,
+      priority = true,
+      localConcurrency = 1,
+      orderByCreatedOn = true,
+      heartbeatRefreshSeconds
+    } = options
+
+    const firstWorkerId = randomUUID({ disableEntropyCache: true })
+
+    const createWorker = (workerId: string) => {
+      let nextIndex = 0
+
+      const fetch = async (): Promise<types.Job<ReqData>[]> => {
+        // Check all queues in round-robin order until a job is found
+        for (let i = 0; i < names.length; i++) {
+          const idx = (nextIndex + i) % names.length
+          const jobs = await this.fetch<ReqData>(names[idx], { batchSize, includeMetadata, priority, orderByCreatedOn })
+          if (jobs.length > 0) {
+            nextIndex = (idx + 1) % names.length
+            return jobs
+          }
+        }
+        nextIndex = (nextIndex + 1) % names.length
+        return []
+      }
+
+      const onFetch = async (jobs: types.Job<ReqData>[]) => {
+        if (!jobs.length) return
+        if (this.config.__test__throw_worker) throw new Error('__test__throw_worker')
+
+        const queueName = jobs[0].name
+
+        this.emitWip(queueName)
+        this.#trackJobsActive(queueName, jobs)
+
+        const worker = this.workers.get(workerId)
+        await this.#processJobs(queueName, jobs, callback, worker, heartbeatRefreshSeconds)
+
+        this.emitWip(queueName)
+      }
+
+      const onError = (error: any) => {
+        this.emit(events.error, { ...error, message: error.message, stack: error.stack, queues: names, worker: workerId })
+      }
+
+      return new Worker<ReqData>({ id: workerId, name: '__roundrobin__', options, interval, fetch, onFetch, onError })
+    }
+
     for (let i = 0; i < localConcurrency; i++) {
       const workerId = i === 0 ? firstWorkerId : randomUUID({ disableEntropyCache: true })
       const worker = createWorker(workerId)
