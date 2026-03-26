@@ -174,6 +174,40 @@ function checkWorkArgs (name: string, args: any[]): {
   return { options, callback }
 }
 
+function checkWorkRoundRobinArgs (getNames: () => Promise<string[]> | string[], args: any[]): {
+  options: types.ResolvedWorkOptions
+  callback: types.WorkHandler<any>
+} {
+  let options, callback
+
+  assert(typeof getNames === 'function', 'getNames must be a function')
+
+  if (args.length === 1) {
+    callback = args[0]
+    options = {}
+  } else if (args.length > 1) {
+    options = args[0] || {}
+    callback = args[1]
+  }
+
+  assert(typeof callback === 'function', 'expected callback to be a function')
+  assert(typeof options === 'object', 'expected config to be an object')
+
+  options = { ...options }
+
+  applyPollingInterval(options)
+
+  assert(!('batchSize' in options) || (Number.isInteger(options.batchSize) && options.batchSize >= 1), 'batchSize must be an integer > 0')
+  assert(!('includeMetadata' in options) || typeof options.includeMetadata === 'boolean', 'includeMetadata must be a boolean')
+  assert(!('priority' in options) || typeof options.priority === 'boolean', 'priority must be a boolean')
+  assert(!('localConcurrency' in options) || (Number.isInteger(options.localConcurrency) && options.localConcurrency >= 1), 'localConcurrency must be an integer >= 1')
+  assert(!('localGroupConcurrency' in options), 'localGroupConcurrency is not supported')
+  assert(!('groupConcurrency' in options), 'groupConcurrency is not supported')
+  validateHeartbeatRefreshConfig(options)
+
+  return { options, callback }
+}
+
 function checkFetchArgs (name: string, options: any) {
   assert(name, 'missing queue name')
 
@@ -358,6 +392,7 @@ export {
   checkFetchArgs,
   checkSendArgs,
   checkWorkArgs,
+  checkWorkRoundRobinArgs,
   getConfig,
   POLICY,
   validateQueueArgs
