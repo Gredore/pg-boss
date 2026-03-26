@@ -17,7 +17,7 @@ describe('workRoundRobin', function () {
     ctx.boss = await helper.start(ctx.bossConfig)
     await expect(async () => {
       // @ts-ignore
-      await ctx.boss.workRoundRobin(['foo'])
+      await ctx.boss.workRoundRobin(() => ['foo'])
     }).rejects.toThrow()
   })
 
@@ -25,7 +25,7 @@ describe('workRoundRobin', function () {
     ctx.boss = await helper.start(ctx.bossConfig)
     await expect(async () => {
       // @ts-ignore
-      await ctx.boss.workRoundRobin(['foo'], async () => {}, 'nope')
+      await ctx.boss.workRoundRobin(() => ['foo'], async () => {}, 'nope')
     }).rejects.toThrow()
   })
 
@@ -49,7 +49,7 @@ describe('workRoundRobin', function () {
       await ctx.boss.send(ctx.schema)
     }
 
-    await ctx.boss.workRoundRobin([ctx.schema], { pollingIntervalSeconds }, async () => {
+    await ctx.boss.workRoundRobin(() => [ctx.schema], { pollingIntervalSeconds }, async () => {
       processCount++
     })
 
@@ -66,7 +66,7 @@ describe('workRoundRobin', function () {
 
     const jobId = await ctx.boss.send(ctx.schema)
 
-    await ctx.boss.workRoundRobin([ctx.schema], async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async ([job]) => {
       receivedSignal = job.signal
     })
 
@@ -84,7 +84,7 @@ describe('workRoundRobin', function () {
 
     const jobId1 = await ctx.boss.send(ctx.schema)
 
-    const workerId = await ctx.boss.workRoundRobin([ctx.schema], { pollingIntervalSeconds: 5 }, async () => processCount++)
+    const workerId = await ctx.boss.workRoundRobin(() => [ctx.schema], { pollingIntervalSeconds: 5 }, async () => processCount++)
 
     assertTruthy(jobId1)
     await spy.waitForJobWithId(jobId1, 'completed')
@@ -106,7 +106,7 @@ describe('workRoundRobin', function () {
 
     let receivedCount = 0
 
-    ctx.boss.workRoundRobin([ctx.schema], async () => {
+    ctx.boss.workRoundRobin(() => [ctx.schema], async () => {
       receivedCount++
       await ctx.boss!.offWork('__roundrobin__')
     })
@@ -127,7 +127,7 @@ describe('workRoundRobin', function () {
     await ctx.boss.send(ctx.schema)
     await ctx.boss.send(ctx.schema)
 
-    const id = await ctx.boss.workRoundRobin([ctx.schema], { pollingIntervalSeconds: 0.5 }, async () => {
+    const id = await ctx.boss.workRoundRobin(() => [ctx.schema], { pollingIntervalSeconds: 0.5 }, async () => {
       receivedCount++
       await ctx.boss!.offWork('__roundrobin__', { id })
     })
@@ -147,7 +147,7 @@ describe('workRoundRobin', function () {
     }
 
     return new Promise<void>((resolve) => {
-      ctx.boss!.workRoundRobin([ctx.schema], { batchSize }, async jobs => {
+      ctx.boss!.workRoundRobin(() => [ctx.schema], { batchSize }, async jobs => {
         expect(jobs.length).toBe(batchSize)
         resolve()
       })
@@ -160,7 +160,7 @@ describe('workRoundRobin', function () {
     const spy = ctx.boss.getSpy(ctx.schema)
     const jobId = await ctx.boss.send(ctx.schema)
 
-    await ctx.boss.workRoundRobin([ctx.schema], { batchSize: 1 }, async jobs => {
+    await ctx.boss.workRoundRobin(() => [ctx.schema], { batchSize: 1 }, async jobs => {
       expect(jobs.length).toBe(1)
     })
 
@@ -180,7 +180,7 @@ describe('workRoundRobin', function () {
       await ctx.boss.send(ctx.schema)
     }
 
-    await ctx.boss.workRoundRobin([ctx.schema], async () => {
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async () => {
       await delay(2000)
       processCount++
     })
@@ -198,7 +198,7 @@ describe('workRoundRobin', function () {
 
     const jobId = await ctx.boss.send(ctx.schema)
 
-    await ctx.boss.workRoundRobin([ctx.schema], async () => result)
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async () => result)
 
     assertTruthy(jobId)
     await spy.waitForJobWithId(jobId, 'completed')
@@ -217,7 +217,7 @@ describe('workRoundRobin', function () {
     const spy = ctx.boss.getSpy(ctx.schema)
 
     const jobId = await ctx.boss.send(ctx.schema)
-    await ctx.boss.workRoundRobin([ctx.schema], async () => ({ something }))
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async () => ({ something }))
 
     assertTruthy(jobId)
     const job = await spy.waitForJobWithId(jobId, 'completed')
@@ -234,7 +234,7 @@ describe('workRoundRobin', function () {
 
     expect(jobId).toBeTruthy()
 
-    await ctx.boss.workRoundRobin([ctx.schema], async ([job]) => ctx.boss!.deleteJob(ctx.schema, job.id))
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async ([job]) => ctx.boss!.deleteJob(ctx.schema, job.id))
 
     assertTruthy(jobId)
     await spy.waitForJobWithId(jobId, 'completed')
@@ -247,8 +247,8 @@ describe('workRoundRobin', function () {
   it('should allow multiple workers to the same queues per instance', async function () {
     ctx.boss = await helper.start(ctx.bossConfig)
 
-    await ctx.boss.workRoundRobin([ctx.schema], async () => {})
-    await ctx.boss.workRoundRobin([ctx.schema], async () => {})
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async () => {})
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async () => {})
   })
 
   it('should honor the includeMetadata option', async function () {
@@ -257,7 +257,7 @@ describe('workRoundRobin', function () {
     await ctx.boss.send(ctx.schema)
 
     return new Promise<void>((resolve) => {
-      ctx.boss!.workRoundRobin([ctx.schema], { includeMetadata: true }, async ([job]) => {
+      ctx.boss!.workRoundRobin(() => [ctx.schema], { includeMetadata: true }, async ([job]) => {
         expect(job.startedOn).toBeDefined()
         resolve()
       })
@@ -269,7 +269,7 @@ describe('workRoundRobin', function () {
 
     const jobId = await ctx.boss.send(ctx.schema, null, { retryLimit: 0, expireInSeconds: 1 })
 
-    await ctx.boss.workRoundRobin([ctx.schema], () => delay(2000))
+    await ctx.boss.workRoundRobin(() => [ctx.schema], () => delay(2000))
 
     await delay(2000)
 
@@ -287,7 +287,7 @@ describe('workRoundRobin', function () {
     const jobId1 = await ctx.boss.send(ctx.schema, null, { retryLimit: 0, expireInSeconds: 1 })
     const jobId2 = await ctx.boss.send(ctx.schema, null, { retryLimit: 0, expireInSeconds: 1 })
 
-    await ctx.boss.workRoundRobin([ctx.schema], { batchSize: 2 }, () => delay(2000))
+    await ctx.boss.workRoundRobin(() => [ctx.schema], { batchSize: 2 }, () => delay(2000))
 
     await delay(2000)
 
@@ -312,7 +312,7 @@ describe('workRoundRobin', function () {
 
     await ctx.boss.send(ctx.schema)
 
-    await ctx.boss.workRoundRobin([ctx.schema], { pollingIntervalSeconds: 1 }, () => delay(2000))
+    await ctx.boss.workRoundRobin(() => [ctx.schema], { pollingIntervalSeconds: 1 }, () => delay(2000))
 
     const wip1 = await firstWipEvent
 
@@ -333,7 +333,7 @@ describe('workRoundRobin', function () {
     await ctx.boss.stop()
 
     await expect(async () => {
-      await ctx.boss!.workRoundRobin([ctx.schema], async () => {})
+      await ctx.boss!.workRoundRobin(() => [ctx.schema], async () => {})
     }).rejects.toThrow()
   })
 
@@ -354,7 +354,7 @@ describe('workRoundRobin', function () {
 
     assertTruthy(jobId)
 
-    await ctx.boss.workRoundRobin([ctx.schema], async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async ([job]) => {
       await new Promise<void>(resolve => {
         job.signal.addEventListener('abort', () => {
           signalAborted = true
@@ -385,7 +385,7 @@ describe('workRoundRobin', function () {
 
     const jobId = await ctx.boss.send(ctx.schema, null, { retryLimit: 0 })
 
-    await ctx.boss.workRoundRobin([ctx.schema], async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async ([job]) => {
       await delay(500)
       signalAborted = job.signal.aborted
     })
@@ -412,7 +412,7 @@ describe('workRoundRobin', function () {
 
     const jobId = await ctx.boss.send(ctx.schema, null, { retryLimit: 0 })
 
-    await ctx.boss.workRoundRobin([ctx.schema], async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [ctx.schema], async ([job]) => {
       handlerStarted = true
       await delay(2000)
       signalAborted = job.signal.aborted
@@ -449,7 +449,7 @@ describe('workRoundRobin', function () {
       jobIds.push(jobId)
     }
 
-    await ctx.boss.workRoundRobin([ctx.schema], { localConcurrency, pollingIntervalSeconds: 0.5 }, async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [ctx.schema], { localConcurrency, pollingIntervalSeconds: 0.5 }, async ([job]) => {
       for (let i = 0; i < 100; i++) {
         if (job.signal.aborted) {
           abortedJobs.push(job.id)
@@ -482,26 +482,36 @@ describe('workRoundRobin', function () {
 
   // --- round-robin-specific validation tests ---
 
-  it('should fail if names is not an array', async function () {
+  it('should emit error event if getNames is not a function', async function () {
     ctx.boss = await helper.start(ctx.bossConfig)
     await expect(async () => {
       // @ts-ignore
-      await ctx.boss.workRoundRobin('not-an-array', async () => {})
+      await ctx.boss.workRoundRobin('not-a-function', async () => {})
     }).rejects.toThrow()
   })
 
-  it('should fail if names array is empty', async function () {
+  it('should fail if getNames returns non-array', async function () {
     ctx.boss = await helper.start(ctx.bossConfig)
-    await expect(async () => {
-      await ctx.boss!.workRoundRobin([], async () => {})
-    }).rejects.toThrow()
+    const errorPromise = new Promise<any>(resolve => ctx.boss!.once('error', resolve))
+    // @ts-ignore
+    await ctx.boss!.workRoundRobin(() => 'not-an-array', async () => {})
+    const err = await errorPromise
+    expect(err).toBeTruthy()
+  })
+
+  it('should emit error event if queue names array is empty', async function () {
+    ctx.boss = await helper.start(ctx.bossConfig)
+    const errorPromise = new Promise<any>(resolve => ctx.boss!.once('error', resolve))
+    await ctx.boss!.workRoundRobin(() => [], async () => {})
+    const err = await errorPromise
+    expect(err).toBeTruthy()
   })
 
   it('should reject localGroupConcurrency option', async function () {
     ctx.boss = await helper.start(ctx.bossConfig)
     await expect(async () => {
       // @ts-ignore
-      await ctx.boss.workRoundRobin([ctx.schema], { localGroupConcurrency: 1 }, async () => {})
+      await ctx.boss.workRoundRobin(() => [ctx.schema], { localGroupConcurrency: 1 }, async () => {})
     }).rejects.toThrow('localGroupConcurrency is not supported')
   })
 
@@ -509,7 +519,7 @@ describe('workRoundRobin', function () {
     ctx.boss = await helper.start(ctx.bossConfig)
     await expect(async () => {
       // @ts-ignore
-      await ctx.boss.workRoundRobin([ctx.schema], { groupConcurrency: 1 }, async () => {})
+      await ctx.boss.workRoundRobin(() => [ctx.schema], { groupConcurrency: 1 }, async () => {})
     }).rejects.toThrow('groupConcurrency is not supported')
   })
 
@@ -530,7 +540,7 @@ describe('workRoundRobin', function () {
 
     const processed: string[] = []
 
-    await ctx.boss.workRoundRobin([queueA, queueB], { pollingIntervalSeconds: 0.5 }, async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [queueA, queueB], { pollingIntervalSeconds: 0.5 }, async ([job]) => {
       processed.push((job.data as any).source)
     })
 
@@ -560,7 +570,7 @@ describe('workRoundRobin', function () {
 
     const processed: string[] = []
 
-    await ctx.boss.workRoundRobin([queueA, queueB], { pollingIntervalSeconds: 0.5 }, async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [queueA, queueB], { pollingIntervalSeconds: 0.5 }, async ([job]) => {
       processed.push((job.data as any).source)
     })
 
@@ -590,7 +600,7 @@ describe('workRoundRobin', function () {
 
     const processed: string[] = []
 
-    await ctx.boss.workRoundRobin([queueA, queueB], { pollingIntervalSeconds: 0.5 }, async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [queueA, queueB], { pollingIntervalSeconds: 0.5 }, async ([job]) => {
       processed.push((job.data as any).source)
     })
 
@@ -629,7 +639,7 @@ describe('workRoundRobin', function () {
 
     const processed: string[] = []
 
-    await ctx.boss.workRoundRobin([queueA, queueB, queueC], { pollingIntervalSeconds: 0.5 }, async ([job]) => {
+    await ctx.boss.workRoundRobin(() => [queueA, queueB, queueC], { pollingIntervalSeconds: 0.5 }, async ([job]) => {
       processed.push((job.data as any).queue)
     })
 
@@ -653,7 +663,7 @@ describe('workRoundRobin', function () {
 
     let receivedCount = 0
 
-    ctx.boss.workRoundRobin([queueA, queueB], async () => {
+    ctx.boss.workRoundRobin(() => [queueA, queueB], async () => {
       receivedCount++
       await ctx.boss!.offWork('__roundrobin__')
     })
@@ -678,7 +688,7 @@ describe('workRoundRobin', function () {
     await ctx.boss.send(queueA)
     await ctx.boss.send(queueB)
 
-    const id = await ctx.boss.workRoundRobin([queueA, queueB], { pollingIntervalSeconds: 0.5 }, async () => {
+    const id = await ctx.boss.workRoundRobin(() => [queueA, queueB], { pollingIntervalSeconds: 0.5 }, async () => {
       receivedCount++
       await ctx.boss!.offWork('__roundrobin__', { id })
     })
@@ -703,7 +713,7 @@ describe('workRoundRobin', function () {
 
     const jobIdA = await ctx.boss.send(queueA, { source: 'a' })
 
-    await ctx.boss.workRoundRobin(names, { pollingIntervalSeconds: 0.5 }, async ([job]) => {
+    await ctx.boss.workRoundRobin(() => names, { pollingIntervalSeconds: 0.5 }, async ([job]) => {
       processed.push((job.data as any).source)
     })
 

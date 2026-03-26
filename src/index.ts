@@ -212,9 +212,9 @@ export class PgBoss extends EventEmitter<types.PgBossEventMap> {
     return this.#manager.work(...args as Parameters<Manager['work']>)
   }
 
-  workRoundRobin<ReqData, ResData = any>(names: string[], handler: types.WorkHandler<ReqData, ResData>): Promise<string>
-  workRoundRobin<ReqData, ResData = any>(names: string[], options: types.WorkOptions & { includeMetadata: true }, handler: types.WorkWithMetadataHandler<ReqData, ResData>): Promise<string>
-  workRoundRobin<ReqData, ResData = any>(names: string[], options: types.WorkOptions, handler: types.WorkHandler<ReqData, ResData>): Promise<string>
+  workRoundRobin<ReqData, ResData = any>(getNames: () => Promise<string[]> | string[], handler: types.WorkHandler<ReqData, ResData>): Promise<string>
+  workRoundRobin<ReqData, ResData = any>(getNames: () => Promise<string[]> | string[], options: types.WorkOptions & { includeMetadata: true }, handler: types.WorkWithMetadataHandler<ReqData, ResData>): Promise<string>
+  workRoundRobin<ReqData, ResData = any>(getNames: () => Promise<string[]> | string[], options: types.WorkOptions, handler: types.WorkHandler<ReqData, ResData>): Promise<string>
   workRoundRobin (...args: any[]): Promise<string> {
     return this.#manager.workRoundRobin(...args as Parameters<Manager['workRoundRobin']>)
   }

@@ -29,7 +29,7 @@ describe('workRoundRobin speed', function () {
     let processed = 0
 
     await ctx.boss.workRoundRobin(
-      queues,
+      () => queues,
       {
         pollingIntervalSeconds: 0.5,
         localConcurrency: workers,

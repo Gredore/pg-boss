@@ -174,13 +174,13 @@ function checkWorkArgs (name: string, args: any[]): {
   return { options, callback }
 }
 
-function checkWorkRoundRobinArgs (names: string[], args: any[]): {
+function checkWorkRoundRobinArgs (getNames: () => Promise<string[]> | string[], args: any[]): {
   options: types.ResolvedWorkOptions
   callback: types.WorkHandler<any>
 } {
   let options, callback
 
-  assert(names.length >= 1, 'requires a non-empty array of queue names')
+  assert(typeof getNames === 'function', 'getNames must be a function')
 
   if (args.length === 1) {
     callback = args[0]

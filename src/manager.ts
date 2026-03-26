@@ -403,15 +403,11 @@ class Manager extends EventEmitter implements types.EventsMixin {
     return firstWorkerId
   }
 
-  workRoundRobin<ReqData>(names: string[], handler: types.WorkHandler<ReqData>): Promise<string>
-  workRoundRobin<ReqData>(names: string[], options: types.WorkOptions & { includeMetadata: true }, handler: types.WorkWithMetadataHandler<ReqData>): Promise<string>
-  workRoundRobin<ReqData>(names: string[], options: types.WorkOptions, handler: types.WorkHandler<ReqData>): Promise<string>
-  async workRoundRobin<ReqData> (names: string[], ...args: unknown[]): Promise<string> {
-    for (const name of names) {
-      Attorney.assertQueueName(name)
-    }
-
-    const { options, callback } = Attorney.checkWorkRoundRobinArgs(names, args)
+  workRoundRobin<ReqData>(getNames: () => Promise<string[]> | string[], handler: types.WorkHandler<ReqData>): Promise<string>
+  workRoundRobin<ReqData>(getNames: () => Promise<string[]> | string[], options: types.WorkOptions & { includeMetadata: true }, handler: types.WorkWithMetadataHandler<ReqData>): Promise<string>
+  workRoundRobin<ReqData>(getNames: () => Promise<string[]> | string[], options: types.WorkOptions, handler: types.WorkHandler<ReqData>): Promise<string>
+  async workRoundRobin<ReqData> (getNames: () => Promise<string[]> | string[], ...args: unknown[]): Promise<string> {
+    const { options, callback } = Attorney.checkWorkRoundRobinArgs(getNames, args)
 
     if (this.stopped) {
       throw new Error('Workers are disabled. pg-boss is stopped')
@@ -433,6 +429,13 @@ class Manager extends EventEmitter implements types.EventsMixin {
       let nextIndex = 0
 
       const fetch = async (): Promise<types.Job<ReqData>[]> => {
+        const names = await getNames()
+        assert(Array.isArray(names), 'getNames must return an array of queue names')
+        assert(names.length >= 1, 'requires a non-empty array of queue names')
+        for (const name of names) {
+          Attorney.assertQueueName(name)
+        }
+
         // Check all queues in round-robin order until a job is found
         for (let i = 0; i < names.length; i++) {
           const idx = (nextIndex + i) % names.length
@@ -462,7 +465,7 @@ class Manager extends EventEmitter implements types.EventsMixin {
       }
 
       const onError = (error: any) => {
-        this.emit(events.error, { ...error, message: error.message, stack: error.stack, queues: names, worker: workerId })
+        this.emit(events.error, { ...error, message: error.message, stack: error.stack, worker: workerId })
       }
 
       return new Worker<ReqData>({ id: workerId, name: '__roundrobin__', options, interval, fetch, onFetch, onError })
